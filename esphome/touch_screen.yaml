@@ -1,0 +1,309 @@
+substitutions:
+  name: "wt32-sc01"
+  friendly_name: "WT32-SC01"
+  id_prefix: "wt32_sc01"
+
+esphome:
+  name: statistiikkanaytto
+  friendly_name: statistiikkanaytto
+
+esp32:
+  board: esp-wrover-kit
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "yourkeyhere"
+
+ota:
+  password: "yourpasswordhere"
+
+wifi:
+  domain: .home.local
+  fast_connect: false
+  reboot_timeout: 15min
+  networks:
+  - ssid: !secret wifi_ssid
+    password: !secret wifi_password
+    hidden: false
+  manual_ip:
+    static_ip: 10.0.60.79
+    gateway: 10.0.60.1
+    subnet: 255.255.255.0
+    dns1: 10.0.60.1
+  ap:
+    ssid: "Statistiikkanaytto"
+    password: !secret fallback_hotspot
+
+captive_portal:
+
+external_components:
+  - source: github://gpambrozio/esphome@FT6336U-touch
+    components: [ ft63x6 ]
+
+output:
+  - platform: ledc
+    pin: GPIO23
+    id: gpio_23_backlight_pwm
+
+light:
+  - platform: monochromatic
+    output: gpio_23_backlight_pwm
+    name: "${friendly_name} Backlight"
+    id: ${id_prefix}_backlight
+    restore_mode: RESTORE_DEFAULT_ON
+  
+i2c:
+  id: i2c_bus_intern
+  sda: 18
+  scl: 19
+  scan: false
+
+spi:
+  clk_pin: GPIO14
+  mosi_pin: GPIO13
+  miso_pin: GPIO12
+
+sensor:
+  - platform: homeassistant
+    id: espi_ulkolampotila
+    entity_id: sensor.ulkolampotila
+  - platform: homeassistant
+    id: espi_huonelampotila
+    entity_id: sensor.l1_huonelampotila
+  - platform: homeassistant
+    id: espi_ollipc_gpuload
+    entity_id: sensor.ollipc_gpuload
+  - platform: homeassistant
+    id: espi_ollipc_gputemperature
+    entity_id: sensor.ollipc_gputemperature
+  - platform: homeassistant
+    id: espi_ollipc_memoryusage
+    entity_id: sensor.ollipc_memoryusage
+  
+text_sensor:
+  - platform: homeassistant
+    id: kaytavanvalot
+    entity_id: binary_sensor.kaytavanvalot
+    internal: true
+  - platform: homeassistant
+    id: nayttovalot
+    entity_id: binary_sensor.nayttovalot
+    internal: true
+  - platform: homeassistant
+    id: takkahuoneen_valot
+    entity_id: binary_sensor.takkahuoneen_valot
+    internal: true
+
+image:
+  - file: mdi:home-thermometer
+    id: icon_home_termometer
+    resize: 80x80
+  - file: mdi:page-next-outline
+    id: icon_next_page
+    resize: 40x40
+  - file: mdi:toggle-switch
+    id: icon_toggle_switch_on
+    resize: 80x80
+  - file: mdi:toggle-switch-off-outline
+    id: icon_toggle_switch_off
+    resize: 80x80
+
+
+touchscreen:
+  - platform: ft63x6
+    id: ${id_prefix}_touch
+    i2c_id: i2c_bus_intern
+    on_touch:
+      - logger.log:
+          format: Touch at (%d, %d)
+          args: [touch.x, touch.y]
+
+font:
+  - file:
+      type: gfonts
+      family: "Open Sans"
+    id: my_font
+    size: 20
+  - file:
+      type: gfonts
+      family: "Open Sans"
+    id: my_font_big
+    size: 50
+  - file:
+      type: gfonts
+      family: "Open Sans"
+    id: my_font_med
+    size: 35
+
+
+color:
+  - id: my_red
+    red: 100%
+    green: 3%
+    blue: 5%
+  - id: my_white
+    red: 100%
+    green: 100%
+    blue: 100%
+  - id: my_green
+    red: 3%
+    green: 100%
+    blue: 5%
+
+### "Page carousel" can possibly be achieved with this kind of config
+#interval:
+#  - interval: 8s
+#    then:
+#      - display.page.show_next: wt32_sc01_display
+#      - component.update: wt32_sc01_display
+
+
+####################################################
+### View stuff on the screen with multiple pages ###
+####################################################
+display:
+  - platform: ili9xxx
+    id: ${id_prefix}_display
+    model: ST7796
+    cs_pin: GPIO15
+    dc_pin: GPIO21
+    reset_pin: GPIO22
+    rotation: 90
+    pages:
+      - id: page1
+        lambda: |-
+          // Info
+          it.printf(64,0, id(my_font), TextAlign::TOP_CENTER, "WT32-SC01");
+          it.printf(64, 60, id(my_font), TextAlign::BOTTOM_CENTER, "Etusivu");
+          // Icons
+          it.image(40, 130, id(icon_home_termometer), id(my_red));
+          // Values
+          it.printf(120, 130, id(my_font_big), "%.1f °C", id(espi_huonelampotila).state);
+          // Bottom
+          it.image(425, 280, id(icon_next_page));
+      - id: page2
+        lambda: |-
+          // Info
+          it.printf(64,0, id(my_font), TextAlign::TOP_CENTER, "WT32-SC01");
+          it.printf(64, 60, id(my_font), TextAlign::BOTTOM_CENTER, "Valot");
+          // Text
+          it.printf(64, 80, id(my_font_med), TextAlign::TOP_LEFT, "Kaytavan valot: ");
+          it.printf(64, 140, id(my_font_med), TextAlign::TOP_LEFT, "Nayttovalot: ");
+          it.printf(64, 200, id(my_font_med), TextAlign::TOP_LEFT, "Kattovalot: ");
+          // Buttons
+          if (id(kaytavanvalot).state == "on") {
+              it.image(370, 68, id(icon_toggle_switch_on), id(my_green));
+            } else if (id(kaytavanvalot).state == "off"){
+                it.image(370, 68, id(icon_toggle_switch_off));
+          }
+          if (id(nayttovalot).state == "on") {
+              it.image(370, 130, id(icon_toggle_switch_on), id(my_green));
+            } else if (id(nayttovalot).state == "off"){
+                it.image(370, 130, id(icon_toggle_switch_off));
+          }
+          if (id(takkahuoneen_valot).state == "on") {
+              it.image(370, 192, id(icon_toggle_switch_on), id(my_green));
+            } else if (id(takkahuoneen_valot).state == "off"){
+                it.image(370, 192, id(icon_toggle_switch_off));
+          }
+          // Bottom
+          it.image(425, 280, id(icon_next_page));
+      - id: page3
+        lambda: |-
+          // Info
+          it.printf(64,0, id(my_font), TextAlign::TOP_CENTER, "WT32-SC01");
+          it.printf(64, 60, id(my_font), TextAlign::BOTTOM_CENTER, "Ollin PC");
+          // Text
+          it.printf(64, 80, id(my_font_med), TextAlign::TOP_LEFT, "GPU load: ");
+          it.printf(64, 140, id(my_font_med), TextAlign::TOP_LEFT, "GPU temp: ");
+          it.printf(64, 200, id(my_font_med), TextAlign::TOP_LEFT, "Mem usage: ");
+          // Values
+          it.printf(350, 80, id(my_font_med), "%.1f %%", id(espi_ollipc_gpuload).state);
+          it.printf(350, 140, id(my_font_med), "%.1f °C", id(espi_ollipc_gputemperature).state);
+          it.printf(350, 200, id(my_font_med), "%.1f %%", id(espi_ollipc_memoryusage).state);
+          // Bottom
+          it.image(425, 280, id(icon_next_page));
+
+
+################################################################
+### Map the parts of the screen that will response to touch ###
+################################################################
+
+binary_sensor:
+  - platform: touchscreen
+    name: Next
+    id: next_view
+    internal: True
+    x_min: 420
+    x_max: 460
+    y_min: 280
+    y_max: 320
+    filters:
+      - delayed_on: 30ms
+    on_press:
+      then:
+        - display.page.show_next: wt32_sc01_display
+        - component.update: wt32_sc01_display
+
+  - platform: touchscreen
+    name: Kaytavanvalot
+    id: touch_kaytavanvalot
+    internal: True
+    x_min: 365
+    x_max: 470
+    y_min: 68
+    y_max: 108
+    page_id: page2
+    filters:
+      - delayed_on: 30ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: switch.toggle
+            data: 
+              entity_id: switch.shelly_1_kaytavanvalot_relay_0
+        - component.update: wt32_sc01_display
+  
+  - platform: touchscreen
+    name: Nayttovalot
+    id: touch_nayttovalot
+    internal: True
+    x_min: 365
+    x_max: 470
+    y_min: 140
+    y_max: 188
+    page_id: page2
+    filters:
+      - delayed_on: 30ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: light.toggle
+            data: 
+              entity_id: light.ollin_nayttovalot
+        - component.update: wt32_sc01_display 
+
+  - platform: touchscreen
+    name: Takkahuoneenvalot
+    id: touch_takkahuoneenvalot
+    internal: True
+    x_min: 365
+    x_max: 470
+    y_min: 212
+    y_max: 268
+    page_id: page2
+    filters:
+      - delayed_on: 30ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: light.toggle
+            data: 
+              entity_id: light.takkahuoneen_kattovalot
+        - component.update: wt32_sc01_display 

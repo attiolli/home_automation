@@ -6,6 +6,8 @@ substitutions:
 esphome:
   name: statistiikkanaytto
   friendly_name: statistiikkanaytto
+  includes: 
+    - statistiikkanaytto/myscreen.h
 
 esp32:
   board: esp-wrover-kit
@@ -71,8 +73,11 @@ spi:
 
 sensor:
   - platform: homeassistant
+    id: espi_takkahuonelampotila
+    entity_id: sensor.takkahuone_lampotila
+  - platform: homeassistant
     id: espi_ulkolampotila
-    entity_id: sensor.ulkolampotila
+    entity_id: sensor.shelly_1_ilpinrele_external_temperature_0
   - platform: homeassistant
     id: espi_huonelampotila
     entity_id: sensor.l1_huonelampotila
@@ -85,7 +90,9 @@ sensor:
   - platform: homeassistant
     id: espi_ollipc_memoryusage
     entity_id: sensor.ollipc_memoryusage
-  
+
+
+
 text_sensor:
   - platform: homeassistant
     id: kaytavanvalot
@@ -99,13 +106,130 @@ text_sensor:
     id: takkahuoneen_valot
     entity_id: binary_sensor.takkahuoneen_valot
     internal: true
+  - platform: homeassistant
+    id: spotify_media_title
+    entity_id: media_player.spotify_spotifyaccountname
+    attribute: media_title
+  - platform: homeassistant
+    id: spotify_media_artist
+    entity_id: media_player.spotify_spotifyaccountname
+    attribute: media_artist
+  - platform: homeassistant
+    id: spotify
+    entity_id: media_player.spotify_spotifyaccountname
+
+
+display:
+  - platform: ili9xxx
+    id: ${id_prefix}_display
+    model: ST7796
+    cs_pin: GPIO15
+    dc_pin: GPIO21
+    reset_pin: GPIO22
+    rotation: 90
+    pages:
+      - id: page1
+        lambda: |-
+          // Header
+          it.printf(myscreen.settings.hxn,myscreen.settings.hyn, id(my_font), TextAlign::TOP_CENTER, "WT32-SC01");
+          it.printf(myscreen.settings.hxv,myscreen.settings.hyv, id(my_font), TextAlign::TOP_CENTER, "Etusivu");
+          // Content
+          it.image(myscreen.settings.i1xi, myscreen.settings.i1yi, id(icon_home_termometer), id(my_red));
+          it.printf(myscreen.settings.i1xv, myscreen.settings.i1yv, id(my_font_med), "%.1f °C", id(espi_takkahuonelampotila).state);
+          it.image(myscreen.settings.i2xi, myscreen.settings.i1yi, id(icon_sun_termometer), id(my_blue));
+          it.printf(myscreen.settings.i2xv, myscreen.settings.i1yv, id(my_font_med), "%.1f °C", id(espi_ulkolampotila).state);
+          // Footer
+          it.image(myscreen.settings.f1xi, myscreen.settings.f1yi, id(icon_previous_page));
+          it.image(myscreen.settings.f2xi, myscreen.settings.f2yi, id(icon_next_page));
+      - id: page2
+        lambda: |-
+          // Header
+          it.printf(myscreen.settings.hxn,myscreen.settings.hyn, id(my_font), TextAlign::TOP_CENTER, "WT32-SC01");
+          it.printf(myscreen.settings.hxv,myscreen.settings.hyv, id(my_font), TextAlign::TOP_CENTER, "Valot");
+          // Text
+          it.printf(64, 80, id(my_font_med), TextAlign::TOP_LEFT, "Kaytavan valot: ");
+          it.printf(64, 140, id(my_font_med), TextAlign::TOP_LEFT, "Nayttovalot: ");
+          it.printf(64, 200, id(my_font_med), TextAlign::TOP_LEFT, "Kattovalot: ");
+          // Buttons
+          if (id(kaytavanvalot).state == "on") {
+              it.image(370, 68, id(icon_toggle_switch_on), id(my_green));
+            } else if (id(kaytavanvalot).state == "off"){
+                it.image(370, 68, id(icon_toggle_switch_off));
+          }
+          if (id(nayttovalot).state == "on") {
+              it.image(370, 130, id(icon_toggle_switch_on), id(my_green));
+            } else if (id(nayttovalot).state == "off"){
+                it.image(370, 130, id(icon_toggle_switch_off));
+          }
+          if (id(takkahuoneen_valot).state == "on") {
+              it.image(370, 192, id(icon_toggle_switch_on), id(my_green));
+            } else if (id(takkahuoneen_valot).state == "off"){
+                it.image(370, 192, id(icon_toggle_switch_off));
+          }
+          // Footer
+          it.image(myscreen.settings.f1xi, myscreen.settings.f1yi, id(icon_previous_page));
+          it.image(myscreen.settings.f2xi, myscreen.settings.f2yi, id(icon_next_page));
+      - id: page3
+        lambda: |-
+          // Header
+          it.printf(myscreen.settings.hxn,myscreen.settings.hyn, id(my_font), TextAlign::TOP_CENTER, "WT32-SC01");
+          it.printf(myscreen.settings.hxv,myscreen.settings.hyv, id(my_font), TextAlign::TOP_CENTER, "Ollin PC");
+          // Text
+          it.printf(64, 80, id(my_font_med), TextAlign::TOP_LEFT, "GPU load: ");
+          it.printf(64, 140, id(my_font_med), TextAlign::TOP_LEFT, "GPU temp: ");
+          it.printf(64, 200, id(my_font_med), TextAlign::TOP_LEFT, "Mem usage: ");
+          // Values
+          it.printf(350, 80, id(my_font_med), "%.1f %%", id(espi_ollipc_gpuload).state);
+          it.printf(350, 140, id(my_font_med), "%.1f °C", id(espi_ollipc_gputemperature).state);
+          it.printf(350, 200, id(my_font_med), "%.1f %%", id(espi_ollipc_memoryusage).state);
+          // Footer
+          it.image(myscreen.settings.f1xi, myscreen.settings.f1yi, id(icon_previous_page));
+          it.image(myscreen.settings.f2xi, myscreen.settings.f2yi, id(icon_next_page));
+      - id: page4
+        lambda: |-
+          // Header
+          it.printf(myscreen.settings.hxn,myscreen.settings.hyn, id(my_font), TextAlign::TOP_CENTER, "WT32-SC01");
+          it.printf(myscreen.settings.hxv,myscreen.settings.hyv, id(my_font), TextAlign::TOP_CENTER, "Spotify");
+          // Content
+          if (id(spotify).state == "playing") {
+            it.image(myscreen.settings.i1xi, myscreen.settings.i1yi, id(icon_music), id(my_green));
+            it.image(myscreen.settings.i1r2xi, myscreen.settings.i1r2yi, id(icon_account_music), id(my_green));
+            it.printf(myscreen.settings.i1xv, myscreen.settings.i1yv, id(my_font_min), "%s", id(spotify_media_title).state.c_str());
+            it.printf(myscreen.settings.i1r2xv, myscreen.settings.i1r2yv, id(my_font_min), "%s", id(spotify_media_artist).state.c_str());
+          } else if (id(spotify).state == "paused") {
+              it.image(myscreen.settings.i1r2xi, myscreen.settings.i1r2yi, id(icon_speaker_paused), id(my_green));
+              it.printf(myscreen.settings.i1r2xv, myscreen.settings.i1r2yv, id(my_font_min), "Spotify paused");
+            }
+              else if (id(spotify).state == "idle") {
+                it.image(myscreen.settings.i1r2xi, myscreen.settings.i1r2yi, id(icon_speaker_off), id(my_green));
+                it.printf(myscreen.settings.i1r2xv, myscreen.settings.i1r2yv, id(my_font_min), "Spotify turned off");
+              }
+
+          it.image(myscreen.settings.i1r3xi, myscreen.settings.i1r3yv, id(icon_music_previous), id(my_green));
+          it.image(myscreen.settings.i2r3xi, myscreen.settings.i1r3yv, id(icon_music_play), id(my_green));
+          it.image(myscreen.settings.i3r3xi, myscreen.settings.i1r3yv, id(icon_music_pause), id(my_green));
+          it.image(myscreen.settings.i4r3xi, myscreen.settings.i1r3yv, id(icon_music_next), id(my_green));
+          it.image(myscreen.settings.i1c4xi, myscreen.settings.i1c4yi, id(icon_music_volup), id(my_green));
+          it.image(myscreen.settings.i2c4xi, myscreen.settings.i2c4yi, id(icon_music_voldown), id(my_green));
+          // Footer
+          it.image(myscreen.settings.f1xi, myscreen.settings.f1yi, id(icon_previous_page));
+          it.image(myscreen.settings.f2xi, myscreen.settings.f2yi, id(icon_next_page));
+
+
+
 
 image:
   - file: mdi:home-thermometer
     id: icon_home_termometer
-    resize: 80x80
+    resize: 60x60
+  - file: mdi:sun-thermometer
+    id: icon_sun_termometer
+    resize: 60x60
   - file: mdi:page-next-outline
     id: icon_next_page
+    resize: 40x40
+  - file: mdi:page-previous-outline
+    id: icon_previous_page
     resize: 40x40
   - file: mdi:toggle-switch
     id: icon_toggle_switch_on
@@ -113,6 +237,39 @@ image:
   - file: mdi:toggle-switch-off-outline
     id: icon_toggle_switch_off
     resize: 80x80
+  - file: mdi:music
+    id: icon_music
+    resize: 40x40
+  - file: mdi:account-music
+    id: icon_account_music
+    resize: 40x40
+  - file: mdi:speaker-pause
+    id: icon_speaker_paused
+    resize: 40x40
+  - file: mdi:speaker-off
+    id: icon_speaker_off
+    resize: 40x40
+  - file: mdi:skip-previous-circle-outline
+    id: icon_music_previous
+    resize: 80x80
+  - file: mdi:skip-next-circle-outline
+    id: icon_music_next
+    resize: 80x80
+  - file: mdi:play-circle-outline
+    id: icon_music_play
+    resize: 80x80
+  - file: mdi:pause-circle-outline
+    id: icon_music_pause
+    resize: 80x80
+  - file: mdi:plus-circle-outline
+    id: icon_music_volup
+    resize: 60x60
+  - file: mdi:minus-circle-outline
+    id: icon_music_voldown
+    resize: 60x60
+
+
+
 
 
 touchscreen:
@@ -140,6 +297,11 @@ font:
       family: "Open Sans"
     id: my_font_med
     size: 35
+  - file:
+      type: gfonts
+      family: "Open Sans"
+    id: my_font_min
+    size: 25
 
 
 color:
@@ -155,6 +317,10 @@ color:
     red: 3%
     green: 100%
     blue: 5%
+  - id: my_blue
+    red: 3%
+    green: 5%
+    blue: 100%
 
 ### "Page carousel" can possibly be achieved with this kind of config
 #interval:
@@ -162,78 +328,6 @@ color:
 #    then:
 #      - display.page.show_next: wt32_sc01_display
 #      - component.update: wt32_sc01_display
-
-
-####################################################
-### View stuff on the screen with multiple pages ###
-####################################################
-display:
-  - platform: ili9xxx
-    id: ${id_prefix}_display
-    model: ST7796
-    cs_pin: GPIO15
-    dc_pin: GPIO21
-    reset_pin: GPIO22
-    rotation: 90
-    pages:
-      - id: page1
-        lambda: |-
-          // Info
-          it.printf(64,0, id(my_font), TextAlign::TOP_CENTER, "WT32-SC01");
-          it.printf(64, 60, id(my_font), TextAlign::BOTTOM_CENTER, "Etusivu");
-          // Icons
-          it.image(40, 130, id(icon_home_termometer), id(my_red));
-          // Values
-          it.printf(120, 130, id(my_font_big), "%.1f °C", id(espi_huonelampotila).state);
-          // Bottom
-          it.image(425, 280, id(icon_next_page));
-      - id: page2
-        lambda: |-
-          // Info
-          it.printf(64,0, id(my_font), TextAlign::TOP_CENTER, "WT32-SC01");
-          it.printf(64, 60, id(my_font), TextAlign::BOTTOM_CENTER, "Valot");
-          // Text
-          it.printf(64, 80, id(my_font_med), TextAlign::TOP_LEFT, "Kaytavan valot: ");
-          it.printf(64, 140, id(my_font_med), TextAlign::TOP_LEFT, "Nayttovalot: ");
-          it.printf(64, 200, id(my_font_med), TextAlign::TOP_LEFT, "Kattovalot: ");
-          // Buttons
-          if (id(kaytavanvalot).state == "on") {
-              it.image(370, 68, id(icon_toggle_switch_on), id(my_green));
-            } else if (id(kaytavanvalot).state == "off"){
-                it.image(370, 68, id(icon_toggle_switch_off));
-          }
-          if (id(nayttovalot).state == "on") {
-              it.image(370, 130, id(icon_toggle_switch_on), id(my_green));
-            } else if (id(nayttovalot).state == "off"){
-                it.image(370, 130, id(icon_toggle_switch_off));
-          }
-          if (id(takkahuoneen_valot).state == "on") {
-              it.image(370, 192, id(icon_toggle_switch_on), id(my_green));
-            } else if (id(takkahuoneen_valot).state == "off"){
-                it.image(370, 192, id(icon_toggle_switch_off));
-          }
-          // Bottom
-          it.image(425, 280, id(icon_next_page));
-      - id: page3
-        lambda: |-
-          // Info
-          it.printf(64,0, id(my_font), TextAlign::TOP_CENTER, "WT32-SC01");
-          it.printf(64, 60, id(my_font), TextAlign::BOTTOM_CENTER, "Ollin PC");
-          // Text
-          it.printf(64, 80, id(my_font_med), TextAlign::TOP_LEFT, "GPU load: ");
-          it.printf(64, 140, id(my_font_med), TextAlign::TOP_LEFT, "GPU temp: ");
-          it.printf(64, 200, id(my_font_med), TextAlign::TOP_LEFT, "Mem usage: ");
-          // Values
-          it.printf(350, 80, id(my_font_med), "%.1f %%", id(espi_ollipc_gpuload).state);
-          it.printf(350, 140, id(my_font_med), "%.1f °C", id(espi_ollipc_gputemperature).state);
-          it.printf(350, 200, id(my_font_med), "%.1f %%", id(espi_ollipc_memoryusage).state);
-          // Bottom
-          it.image(425, 280, id(icon_next_page));
-
-
-################################################################
-### Map the parts of the screen that will response to touch ###
-################################################################
 
 binary_sensor:
   - platform: touchscreen
@@ -245,10 +339,25 @@ binary_sensor:
     y_min: 280
     y_max: 320
     filters:
-      - delayed_on: 30ms
+      - delayed_on: 300ms
     on_press:
       then:
         - display.page.show_next: wt32_sc01_display
+        - component.update: wt32_sc01_display
+
+  - platform: touchscreen
+    name: Previous
+    id: previous_view
+    internal: True
+    x_min: 20
+    x_max: 60
+    y_min: 280
+    y_max: 320
+    filters:
+      - delayed_on: 300ms
+    on_press:
+      then:
+        - display.page.show_previous: wt32_sc01_display
         - component.update: wt32_sc01_display
 
   - platform: touchscreen
@@ -261,15 +370,15 @@ binary_sensor:
     y_max: 108
     page_id: page2
     filters:
-      - delayed_on: 30ms
+      - delayed_on: 300ms
     on_press:
       then:
         - homeassistant.service:
             service: switch.toggle
-            data: 
+            data:
               entity_id: switch.shelly_1_kaytavanvalot_relay_0
         - component.update: wt32_sc01_display
-  
+
   - platform: touchscreen
     name: Nayttovalot
     id: touch_nayttovalot
@@ -280,14 +389,14 @@ binary_sensor:
     y_max: 188
     page_id: page2
     filters:
-      - delayed_on: 30ms
+      - delayed_on: 300ms
     on_press:
       then:
         - homeassistant.service:
             service: light.toggle
-            data: 
+            data:
               entity_id: light.ollin_nayttovalot
-        - component.update: wt32_sc01_display 
+        - component.update: wt32_sc01_display
 
   - platform: touchscreen
     name: Takkahuoneenvalot
@@ -299,11 +408,130 @@ binary_sensor:
     y_max: 268
     page_id: page2
     filters:
-      - delayed_on: 30ms
+      - delayed_on: 300ms
     on_press:
       then:
         - homeassistant.service:
             service: light.toggle
-            data: 
+            data:
               entity_id: light.takkahuoneen_kattovalot
-        - component.update: wt32_sc01_display 
+        - component.update: wt32_sc01_display
+
+  - platform: touchscreen
+    name: Mediaprevious
+    id: touch_mediaprevious
+    internal: True
+    x_min: 20
+    x_max: 100
+    y_min: 175
+    y_max: 235
+    page_id: page4
+    filters:
+      - delayed_on: 300ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: media_player.media_previous_track
+            data:
+              entity_id: media_player.spotify_spotifyaccountname
+        - component.update: wt32_sc01_display
+
+  - platform: touchscreen
+    name: Mediaplay
+    id: touch_mediaplay
+    internal: True
+    x_min: 110
+    x_max: 190
+    y_min: 175
+    y_max: 235
+    page_id: page4
+    filters:
+      - delayed_on: 300ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: media_player.select_source
+            data:
+              source: OLLIPC
+              entity_id: media_player.spotify_spotifyaccountname
+        - homeassistant.service:
+            service: media_player.media_play
+            data:
+              entity_id: media_player.spotify_spotifyaccountname
+        - component.update: wt32_sc01_display
+
+  - platform: touchscreen
+    name: Mediapause
+    id: touch_mediapause
+    internal: True
+    x_min: 200
+    x_max: 280
+    y_min: 175
+    y_max: 235
+    page_id: page4
+    filters:
+      - delayed_on: 300ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: media_player.media_pause
+            data:
+              entity_id: media_player.spotify_spotifyaccountname
+        - component.update: wt32_sc01_display
+
+  - platform: touchscreen
+    name: Medianext
+    id: touch_medianext
+    internal: True
+    x_min: 290
+    x_max: 370
+    y_min: 175
+    y_max: 235
+    page_id: page4
+    filters:
+      - delayed_on: 300ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: media_player.media_next_track
+            data:
+              entity_id: media_player.spotify_spotifyaccountname
+        - component.update: wt32_sc01_display
+
+  - platform: touchscreen
+    name: Mediavolup
+    id: touch_mediavolup
+    internal: True
+    x_min: 395
+    x_max: 455
+    y_min: 130
+    y_max: 190
+    page_id: page4
+    filters:
+      - delayed_on: 300ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: button.press
+            data:
+              entity_id: button.ollipc_mediavolumeup
+        - component.update: wt32_sc01_display
+
+  - platform: touchscreen
+    name: Mediavoldown
+    id: touch_mediavoldown
+    internal: True
+    x_min: 395
+    x_max: 455
+    y_min: 195
+    y_max: 255
+    page_id: page4
+    filters:
+      - delayed_on: 300ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: button.press
+            data:
+              entity_id: button.ollipc_mediavolumedown
+        - component.update: wt32_sc01_display

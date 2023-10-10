@@ -90,8 +90,12 @@ sensor:
   - platform: homeassistant
     id: espi_ollipc_memoryusage
     entity_id: sensor.ollipc_memoryusage
-
-
+  - platform: homeassistant
+    id: hvac_level
+    entity_id: climate.hitachi_ilmalampopumppu
+    attribute: temperature
+  
+ 
 
 text_sensor:
   - platform: homeassistant
@@ -108,15 +112,19 @@ text_sensor:
     internal: true
   - platform: homeassistant
     id: spotify_media_title
-    entity_id: media_player.spotify_spotifyaccountname
+    entity_id: media_player.spotify_attley86
     attribute: media_title
   - platform: homeassistant
     id: spotify_media_artist
-    entity_id: media_player.spotify_spotifyaccountname
+    entity_id: media_player.spotify_attley86
     attribute: media_artist
   - platform: homeassistant
     id: spotify
-    entity_id: media_player.spotify_spotifyaccountname
+    entity_id: media_player.spotify_attley86
+  - platform: homeassistant
+    id: hvac_mode
+    entity_id: climate.hitachi_ilmalampopumppu
+
 
 
 display:
@@ -204,7 +212,7 @@ display:
                 it.image(myscreen.settings.i1r2xi, myscreen.settings.i1r2yi, id(icon_speaker_off), id(my_green));
                 it.printf(myscreen.settings.i1r2xv, myscreen.settings.i1r2yv, id(my_font_min), "Spotify turned off");
               }
-
+          
           it.image(myscreen.settings.i1r3xi, myscreen.settings.i1r3yv, id(icon_music_previous), id(my_green));
           it.image(myscreen.settings.i2r3xi, myscreen.settings.i1r3yv, id(icon_music_play), id(my_green));
           it.image(myscreen.settings.i3r3xi, myscreen.settings.i1r3yv, id(icon_music_pause), id(my_green));
@@ -214,9 +222,48 @@ display:
           // Footer
           it.image(myscreen.settings.f1xi, myscreen.settings.f1yi, id(icon_previous_page));
           it.image(myscreen.settings.f2xi, myscreen.settings.f2yi, id(icon_next_page));
+        
+      - id: page5
+        lambda: |-
+          // Header
+          it.printf(myscreen.settings.hxn,myscreen.settings.hyn, id(my_font), TextAlign::TOP_CENTER, "WT32-SC01");
+          it.printf(myscreen.settings.hxv,myscreen.settings.hyv, id(my_font), TextAlign::TOP_CENTER, "Ilppi");
+          // Content
+          if (id(hvac_mode).state == "heat") {
+            it.image(myscreen.settings.i1xi, myscreen.settings.i1yi, id(icon_hvac_small), id(my_red));
+            it.image(myscreen.settings.i1r2xi, myscreen.settings.i1r2yi, id(icon_plus_minus), id(my_red));
+            it.printf(myscreen.settings.i1xv, myscreen.settings.i1yv, id(my_font_min), "%s", id(hvac_mode).state.c_str());
+            it.printf(myscreen.settings.i1r2xv, myscreen.settings.i1r2yv, id(my_font_min), "%.1f °C", id(hvac_level).state);
+          } else if (id(hvac_mode).state == "cool") {
+              it.image(myscreen.settings.i1xi, myscreen.settings.i1yi, id(icon_hvac_cool_small), id(my_blue));
+              it.image(myscreen.settings.i1r2xi, myscreen.settings.i1r2yi, id(icon_plus_minus), id(my_blue));
+              it.printf(myscreen.settings.i1xv, myscreen.settings.i1yv, id(my_font_min), "%s", id(hvac_mode).state.c_str());
+              it.printf(myscreen.settings.i1r2xv, myscreen.settings.i1r2yv, id(my_font_min), "%.1f °C", id(hvac_level).state);
+            }
+              else if (id(hvac_mode).state == "dry") {
+                it.image(myscreen.settings.i1xi, myscreen.settings.i1yi, id(icon_hvac_dry_small), id(my_blue));
+                it.image(myscreen.settings.i1r2xi, myscreen.settings.i1r2yi, id(icon_plus_minus), id(my_blue));
+                it.printf(myscreen.settings.i1xv, myscreen.settings.i1yv, id(my_font_min), "%s", id(hvac_mode).state.c_str());
+                it.printf(myscreen.settings.i1r2xv, myscreen.settings.i1r2yv, id(my_font_min), "%.1f °C", id(hvac_level).state);
+              }
+                else if (id(hvac_mode).state == "off") {
+                  it.image(myscreen.settings.i1r2xi, myscreen.settings.i1r2yi, id(icon_hvac_power_small));
+                  it.printf(myscreen.settings.i1r2xv, myscreen.settings.i1r2yv, id(my_font_min), "Ilppi pois");
+                }
+              
+          // Hvac buttons
+          it.image(myscreen.settings.i1r3xi, myscreen.settings.i1r3yv, id(icon_hvac_power_large));
+          it.image(myscreen.settings.i2r3xi, myscreen.settings.i1r3yv, id(icon_hvac_large));
+          it.image(myscreen.settings.i3r3xi, myscreen.settings.i1r3yv, id(icon_hvac_cool_large));
+          it.image(myscreen.settings.i4r3xi, myscreen.settings.i1r3yv, id(icon_hvac_dry_large));
+          it.image(myscreen.settings.i1c4xi, myscreen.settings.i1c4yi, id(icon_music_volup));
+          it.image(myscreen.settings.i2c4xi, myscreen.settings.i2c4yi, id(icon_music_voldown));
+          // Footer
+          it.image(myscreen.settings.f1xi, myscreen.settings.f1yi, id(icon_previous_page));
+          it.image(myscreen.settings.f2xi, myscreen.settings.f2yi, id(icon_next_page));
 
 
-
+          
 
 image:
   - file: mdi:home-thermometer
@@ -267,9 +314,36 @@ image:
   - file: mdi:minus-circle-outline
     id: icon_music_voldown
     resize: 60x60
+  - file: mdi:plus-minus
+    id: icon_plus_minus
+    resize: 40x40
+  - file: mdi:fire
+    id: icon_hvac_large
+    resize: 80x80
+  - file: mdi:fire
+    id: icon_hvac_small
+    resize: 40x40
+  - file: mdi:snowflake
+    id: icon_hvac_cool_small
+    resize: 40x40
+  - file: mdi:snowflake
+    id: icon_hvac_cool_large
+    resize: 80x80
+  - file: mdi:water-percent
+    id: icon_hvac_dry_small
+    resize: 40x40
+  - file: mdi:water-percent
+    id: icon_hvac_dry_large
+    resize: 80x80
+  - file: mdi:power
+    id: icon_hvac_power_small
+    resize: 40x40
+  - file: mdi:power
+    id: icon_hvac_power_large
+    resize: 80x80
 
 
-
+    
 
 
 touchscreen:
@@ -375,10 +449,10 @@ binary_sensor:
       then:
         - homeassistant.service:
             service: switch.toggle
-            data:
+            data: 
               entity_id: switch.shelly_1_kaytavanvalot_relay_0
         - component.update: wt32_sc01_display
-
+  
   - platform: touchscreen
     name: Nayttovalot
     id: touch_nayttovalot
@@ -394,9 +468,9 @@ binary_sensor:
       then:
         - homeassistant.service:
             service: light.toggle
-            data:
+            data: 
               entity_id: light.ollin_nayttovalot
-        - component.update: wt32_sc01_display
+        - component.update: wt32_sc01_display 
 
   - platform: touchscreen
     name: Takkahuoneenvalot
@@ -413,9 +487,9 @@ binary_sensor:
       then:
         - homeassistant.service:
             service: light.toggle
-            data:
+            data: 
               entity_id: light.takkahuoneen_kattovalot
-        - component.update: wt32_sc01_display
+        - component.update: wt32_sc01_display 
 
   - platform: touchscreen
     name: Mediaprevious
@@ -432,10 +506,10 @@ binary_sensor:
       then:
         - homeassistant.service:
             service: media_player.media_previous_track
-            data:
-              entity_id: media_player.spotify_spotifyaccountname
+            data: 
+              entity_id: media_player.spotify_attley86
         - component.update: wt32_sc01_display
-
+  
   - platform: touchscreen
     name: Mediaplay
     id: touch_mediaplay
@@ -453,13 +527,13 @@ binary_sensor:
             service: media_player.select_source
             data:
               source: OLLIPC
-              entity_id: media_player.spotify_spotifyaccountname
+              entity_id: media_player.spotify_attley86
         - homeassistant.service:
             service: media_player.media_play
-            data:
-              entity_id: media_player.spotify_spotifyaccountname
+            data: 
+              entity_id: media_player.spotify_attley86
         - component.update: wt32_sc01_display
-
+  
   - platform: touchscreen
     name: Mediapause
     id: touch_mediapause
@@ -475,8 +549,8 @@ binary_sensor:
       then:
         - homeassistant.service:
             service: media_player.media_pause
-            data:
-              entity_id: media_player.spotify_spotifyaccountname
+            data: 
+              entity_id: media_player.spotify_attley86
         - component.update: wt32_sc01_display
 
   - platform: touchscreen
@@ -494,8 +568,8 @@ binary_sensor:
       then:
         - homeassistant.service:
             service: media_player.media_next_track
-            data:
-              entity_id: media_player.spotify_spotifyaccountname
+            data: 
+              entity_id: media_player.spotify_attley86
         - component.update: wt32_sc01_display
 
   - platform: touchscreen
@@ -513,7 +587,7 @@ binary_sensor:
       then:
         - homeassistant.service:
             service: button.press
-            data:
+            data: 
               entity_id: button.ollipc_mediavolumeup
         - component.update: wt32_sc01_display
 
@@ -532,6 +606,137 @@ binary_sensor:
       then:
         - homeassistant.service:
             service: button.press
-            data:
+            data: 
               entity_id: button.ollipc_mediavolumedown
+        - component.update: wt32_sc01_display
+
+  - platform: touchscreen
+    name: Hvacoff
+    id: touch_hvacoff
+    internal: True
+    x_min: 20
+    x_max: 100
+    y_min: 175
+    y_max: 235
+    page_id: page5
+    filters:
+      - delayed_on: 300ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: climate.turn_off
+            data: 
+              entity_id: climate.hitachi_ilmalampopumppu
+        - component.update: wt32_sc01_display
+  
+  - platform: touchscreen
+    name: Hvacheat
+    id: touch_hvacheat
+    internal: True
+    x_min: 110
+    x_max: 190
+    y_min: 175
+    y_max: 235
+    page_id: page5
+    filters:
+      - delayed_on: 300ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: climate.turn_on
+            data:
+              entity_id: climate.hitachi_ilmalampopumppu
+        - homeassistant.service:
+            service: climate.set_hvac_mode
+            data:
+              hvac_mode: heat
+              entity_id: climate.hitachi_ilmalampopumppu
+        - component.update: wt32_sc01_display
+  
+  - platform: touchscreen
+    name: Hvaccool
+    id: touch_hvaccool
+    internal: True
+    x_min: 200
+    x_max: 280
+    y_min: 175
+    y_max: 235
+    page_id: page5
+    filters:
+      - delayed_on: 300ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: climate.turn_on
+            data:
+              entity_id: climate.hitachi_ilmalampopumppu
+        - homeassistant.service:
+            service: climate.set_hvac_mode
+            data:
+              hvac_mode: cool
+              entity_id: climate.hitachi_ilmalampopumppu
+        - component.update: wt32_sc01_display
+
+  - platform: touchscreen
+    name: Hvacdry
+    id: touch_hvacdry
+    internal: True
+    x_min: 290
+    x_max: 370
+    y_min: 175
+    y_max: 235
+    page_id: page5
+    filters:
+      - delayed_on: 300ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: climate.turn_on
+            data:
+              entity_id: climate.hitachi_ilmalampopumppu
+        - homeassistant.service:
+            service: climate.set_hvac_mode
+            data:
+              hvac_mode: dry
+              entity_id: climate.hitachi_ilmalampopumppu
+        - component.update: wt32_sc01_display
+
+  - platform: touchscreen
+    name: Hvacup
+    id: touch_hvacup
+    internal: True
+    x_min: 395
+    x_max: 455
+    y_min: 130
+    y_max: 190
+    page_id: page5
+    filters:
+      - delayed_on: 300ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: climate.set_temperature
+            data:
+              temperature: !lambda return id(hvac_level).state+1;
+              entity_id: climate.hitachi_ilmalampopumppu
+        - component.update: wt32_sc01_display
+
+  - platform: touchscreen
+    name: Hvacdown
+    id: touch_hvacdown
+    internal: True
+    x_min: 395
+    x_max: 455
+    y_min: 195
+    y_max: 255
+    page_id: page5
+    filters:
+      - delayed_on: 300ms
+    on_press:
+      then:
+        - homeassistant.service:
+            service: climate.set_temperature
+            data: 
+              temperature: !lambda return id(hvac_level).state-1;
+              entity_id: climate.hitachi_ilmalampopumppu
         - component.update: wt32_sc01_display

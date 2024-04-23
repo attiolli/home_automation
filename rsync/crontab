@@ -1,0 +1,2 @@
+# Using with crontab for eg:
+0 */4 * * * echo "$(date +\%Y\%m\%d_\%H\%M\%S): Starting rsync" >> /var/log/rsync.log && rsync -avz --exclude 'archived*/' --exclude 'somethingother/' --backup --backup-dir="$(date +\%Y.\%m.\%d)" user@1.2.3.4:/my/srcpath/ /local/targetpath/ >> /var/log/rsync.log 2>&1

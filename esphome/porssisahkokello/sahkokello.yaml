@@ -1,0 +1,257 @@
+esphome:
+  name: sahkokello
+  friendly_name: sahkokello
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+globals:
+  - id: start_led_param
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: end_led_param
+    type: int
+    restore_value: no
+    initial_value: '0'
+  - id: led_brightness
+    type: float
+    restore_value: yes
+    initial_value: '0.25'
+  - id: prices_12h
+    type: float[12]
+    restore_value: no
+
+logger:
+
+http_request:
+  id: my_request
+  useragent: esphome/1.0
+  verify_ssl: false
+
+api:
+  encryption:
+    key: "V/wwufPJjMUIHpJso+bUTsVFlmwDUIARot9B0XwA7v4="
+
+ota:
+  - platform: esphome
+    password: "d8eb9d97c18e4927415ac235bdf6a293"
+
+wifi:
+  ssid: !secret wifi50_ssid
+  password: !secret wifi50_password
+
+  ap:
+    ssid: "SahkokelloAP"
+    password: "wPmheT2aPK33"
+
+time:
+  - platform: sntp
+    id: ntp_time
+    timezone: Europe/Helsinki
+
+captive_portal:
+
+# Enable the Web Server for the HTTP interface
+web_server:
+  port: 80
+
+number:
+  - platform: template
+    name: "LED Brightness"
+    id: led_brightness_input
+    min_value: 0.0
+    max_value: 1.0
+    step: 0.01
+    icon: "mdi:brightness-7"
+    optimistic: true
+    on_value:
+      then:
+        - script.execute: update_led_brightness
+
+# LED strip configuration
+light:
+  - platform: fastled_clockless
+    chipset: WS2812B
+    pin: GPIO27
+    num_leds: 60
+    rgb_order: GRB
+    name: "led_power_ring"
+    id: led_power_ring
+
+# Sensor to store the current hour price
+sensor:
+  - platform: template
+    name: "Current Hour Price"
+    id: current_hour_price
+    unit_of_measurement: "€"
+
+text_sensor:
+  - platform: template
+    id: led_color
+    name: "LED Color"
+    on_value:
+      then:
+        - lambda: |-
+            // Set the initial value of LED color (green)
+            id(led_color).publish_state("green");
+
+script:
+  - id: set_led_color
+    then:
+      - light.addressable_set:
+          id: led_power_ring
+          color_brightness: !lambda 'return id(led_brightness);'
+          red: !lambda 'return id(led_color).state == "red" ? 1.0 : 0.0;'
+          green: !lambda 'return id(led_color).state == "green" ? 1.0 : 0.0;'
+          blue: !lambda 'return id(led_color).state == "orange" ? 0.65 : 0.0;'
+          range_from: !lambda 'return {id(start_led_param)};'
+          range_to: !lambda 'return {id(end_led_param)};'
+  - id: update_leds_based_on_prices
+    then:
+      - lambda: |-
+          int current_hour = id(ntp_time).now().hour;  // Get the current hour from NTP time
+          int leds_per_sector = 5;  // 5 LEDs per sector
+          int num_sectors = 12;  // Total 12 sectors on clock
+  
+          // Calculate start sector based on current hour to align sectors with the clock
+          int start_sector = current_hour % num_sectors;
+  
+          // Loop through each sector starting from the calculated starting sector
+          for (int sector_offset = 0; sector_offset < num_sectors; sector_offset++) {
+            // Map sector to the appropriate position on the clock
+            int sector = (start_sector + sector_offset) % num_sectors;
+  
+            // Calculate the actual hour this sector corresponds to in a 24-hour format
+            int hour_for_sector = (current_hour + sector_offset) % 24;
+  
+            // Determine LED range for this sector
+            int start_led = sector * leds_per_sector;
+            int end_led = start_led + leds_per_sector - 1;
+  
+            // Fetch the price for the current hour in the `prices_12h` array
+            float price = id(prices_12h)[sector_offset];
+  
+            // Set LED color based on price range
+            if (price < 0.050) {  // Low price - Green
+              id(start_led_param) = start_led;
+              id(end_led_param) = end_led;
+              id(set_green_led_range).execute();
+            } else if (price >= 0.050 && price < 0.150) {  // Medium price - Yellow
+              id(start_led_param) = start_led;
+              id(end_led_param) = end_led;
+              id(set_yellow_led_range).execute();
+            } else {  // High price - Red
+              id(start_led_param) = start_led;
+              id(end_led_param) = end_led;
+              id(set_red_led_range).execute();
+            }
+  
+            // Log the hour, sector, price, and LED range
+            ESP_LOGD("led_update", "Sector %d (Hour %d) Price: %.3f EUR, LEDs %d-%d set to color", sector + 1, hour_for_sector, price, start_led, end_led);
+          }
+  - id: fetch_12h_prices
+    then:
+      - lambda: |-
+          // New URL for fetching prices
+          const char* url = "https://elspotcontrol.netlify.app/spotprices-v01-FI.json";
+  
+          // Log the URL to debug
+          ESP_LOGD("http_request", "Requesting URL: %s", url);
+  
+          // Initialize the HTTP client
+          HTTPClient http;
+          http.begin(url);
+          int http_code = http.GET();
+  
+          // Log HTTP status code
+          ESP_LOGD("http_request", "HTTP Status Code: %d", http_code);
+  
+          // Check if the HTTP request was successful
+          if (http_code == 200) {
+            // Increase buffer size to handle the JSON data based on page size
+            DynamicJsonDocument doc(4096);  // Adjusted for safe parsing
+            DeserializationError error = deserializeJson(doc, http.getString());
+  
+            if (!error) {
+              JsonObject hourly_prices = doc["hourly_prices"];
+              auto now = id(ntp_time).now();
+              int start_hour = now.hour;
+  
+              // Loop to populate the next 12 hours of prices in `prices_12h`
+              for (int i = 0; i < 12; i++) {
+                int hour = (start_hour + i) % 24;
+                int day_offset = (start_hour + i) / 24;
+  
+                // Construct the key in the format "0.x" or "1.x" depending on the day
+                char hour_key[10];
+                snprintf(hour_key, sizeof(hour_key), "%d.%d", day_offset, hour);
+  
+                // Check if the key exists in the JSON data
+                if (hourly_prices.containsKey(hour_key)) {
+                  float price = hourly_prices[hour_key]["price"].as<float>() / 1000.0 * 1.255;  // Adjust for EUR per kWh
+                  id(prices_12h)[i] = price;
+                  ESP_LOGD("http_request", "Hour %d Price: %.5f EUR/kWh", start_hour + i, price);
+                } else {
+                  ESP_LOGD("http_request", "Key %s not found in JSON data.", hour_key);
+                }
+              }
+            } else {
+              ESP_LOGD("http_request", "Failed to parse JSON or incorrect format.");
+            }
+          } else {
+            // Log failure details
+            ESP_LOGD("http_request", "Failed to fetch data. HTTP Code: %d", http_code);
+            String response_body = http.getString();
+            ESP_LOGD("http_request", "HTTP Response Body: %s", response_body.c_str());
+          }
+  
+          // End the HTTP request
+          http.end();
+
+      - script.execute: update_leds_based_on_prices
+
+  - id: update_led_brightness
+    then:
+      - lambda: |-
+          float brightness = round(id(led_brightness_input).state * 100.0) / 100.0;
+          id(led_brightness) = brightness;
+          ESP_LOGD("brightness_logger", "LED Brightness input: %.2f, Global brightness updated to: %.2f", id(led_brightness_input).state, id(led_brightness));
+
+  - id: set_red_led_range
+    then:
+      - light.addressable_set:
+          id: led_power_ring
+          color_brightness: !lambda 'return id(led_brightness);'
+          red: 1.0
+          green: 0.0
+          blue: 0.0
+          range_from: !lambda 'return {id(start_led_param)};'
+          range_to: !lambda 'return {id(end_led_param)};'
+  - id: set_yellow_led_range
+    then:
+      - light.addressable_set:
+          id: led_power_ring
+          color_brightness: !lambda 'return id(led_brightness);'
+          red: 1.0
+          green: 0.65
+          blue: 0.0
+          range_from: !lambda 'return {id(start_led_param)};'
+          range_to: !lambda 'return {id(end_led_param)};'
+  - id: set_green_led_range
+    then:
+      - light.addressable_set:
+          id: led_power_ring
+          color_brightness: !lambda 'return id(led_brightness);'
+          red: 0.0
+          green: 1.0
+          blue: 0.0
+          range_from: !lambda 'return {id(start_led_param)};'
+          range_to: !lambda 'return {id(end_led_param)};'
+
+interval:
+  - interval: 60s  # Runs every minute
+    then:
+      - script.execute: fetch_12h_prices

@@ -112,44 +112,32 @@ script:
   - id: update_leds_based_on_prices
     then:
       - lambda: |-
-          int current_hour = id(ntp_time).now().hour;  // Get the current hour from NTP time
-          int leds_per_sector = 5;  // 5 LEDs per sector
-          int num_sectors = 12;  // Total 12 sectors on clock
-  
-          // Calculate start sector based on current hour to align sectors with the clock
+          int current_hour = id(ntp_time).now().hour;
+          int leds_per_sector = 5;
+          int num_sectors = 12;
           int start_sector = current_hour % num_sectors;
   
-          // Loop through each sector starting from the calculated starting sector
           for (int sector_offset = 0; sector_offset < num_sectors; sector_offset++) {
-            // Map sector to the appropriate position on the clock
             int sector = (start_sector + sector_offset) % num_sectors;
-  
-            // Calculate the actual hour this sector corresponds to in a 24-hour format
             int hour_for_sector = (current_hour + sector_offset) % 24;
-  
-            // Determine LED range for this sector
             int start_led = sector * leds_per_sector;
             int end_led = start_led + leds_per_sector - 1;
-  
-            // Fetch the price for the current hour in the `prices_12h` array
             float price = id(prices_12h)[sector_offset];
   
-            // Set LED color based on price range
-            if (price < 0.050) {  // Low price - Green
+            if (price < 0.050) {
               id(start_led_param) = start_led;
               id(end_led_param) = end_led;
               id(set_green_led_range).execute();
-            } else if (price >= 0.050 && price < 0.150) {  // Medium price - Yellow
+            } else if (price >= 0.050 && price < 0.150) {
               id(start_led_param) = start_led;
               id(end_led_param) = end_led;
               id(set_yellow_led_range).execute();
-            } else {  // High price - Red
+            } else {
               id(start_led_param) = start_led;
               id(end_led_param) = end_led;
               id(set_red_led_range).execute();
             }
   
-            // Log the hour, sector, price, and LED range
             ESP_LOGD("led_update", "Sector %d (Hour %d) Price: %.3f EUR, LEDs %d-%d set to color", sector + 1, hour_for_sector, price, start_led, end_led);
           }
   - id: fetch_12h_prices
@@ -164,20 +152,21 @@ script:
           ESP_LOGD("http_request", "HTTP Status Code: %d", http_code);
   
           if (http_code == 200) {
+            String response_body = http.getString();
             DynamicJsonDocument doc(8192);  // Adjusted for larger JSON data
-            DeserializationError error = deserializeJson(doc, http.getString());
+            DeserializationError error = deserializeJson(doc, response_body);
   
             if (!error) {
               JsonObject hourly_prices = doc["hourly_prices"];
               auto now = id(ntp_time).now();
               int start_hour = now.hour;
-              int day_of_month = now.day_of_month;  // Use day_of_month instead of day
-              int day_offset = 0;
+              int day_of_month = now.day_of_month;
               bool found_starting_hour = false;
-              int i = 0;  // Declare i outside the loop
+              int count = 0;
   
               for (JsonPair kv : hourly_prices) {
-                const char* hour_key = kv.key().c_str();
+                if (count >= 12) break;  // Ensure no more than 12 entries are processed
+  
                 const char* time_str = kv.value()["time"];
                 struct tm tm;
                 strptime(time_str, "%Y-%m-%d %H:%M:%S%z", &tm);
@@ -186,28 +175,22 @@ script:
                   found_starting_hour = true;
                 }
   
-                if (found_starting_hour) {
-                  i = day_offset * 24 + tm.tm_hour - start_hour;
-                  if (i >= 0 && i < 12) {
-                    float price = kv.value()["price"].as<float>() / 1000.0 * 1.255;
-                    id(prices_12h)[i] = price;
-                    ESP_LOGD("http_request", "Hour %d Price: %.5f EUR/kWh", start_hour + i, price);
-                  }
+                if (found_starting_hour && count < 12) {
+                  float price = kv.value()["price"].as<float>() / 1000.0 * 1.255;
+                  id(prices_12h)[count] = price;
+                  ESP_LOGD("http_request", "Hour %d Price: %.5f EUR/kWh", start_hour + count, price);
+                  count++;
                 }
-  
-                if (i >= 12) break;  // Stop after 12 entries
               }
             } else {
               ESP_LOGD("http_request", "Failed to parse JSON or incorrect format.");
             }
           } else {
             ESP_LOGD("http_request", "Failed to fetch data. HTTP Code: %d", http_code);
-            String response_body = http.getString();
-            ESP_LOGD("http_request", "HTTP Response Body: %s", response_body.c_str());
           }
-  
           http.end();
-
+  
+  
       - script.execute: update_leds_based_on_prices
 
   - id: update_led_brightness

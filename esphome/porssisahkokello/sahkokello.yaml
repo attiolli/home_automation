@@ -155,60 +155,57 @@ script:
   - id: fetch_12h_prices
     then:
       - lambda: |-
-          // New URL for fetching prices
           const char* url = "https://elspotcontrol.netlify.app/spotprices-v01-FI.json";
-  
-          // Log the URL to debug
           ESP_LOGD("http_request", "Requesting URL: %s", url);
   
-          // Initialize the HTTP client
           HTTPClient http;
           http.begin(url);
           int http_code = http.GET();
-  
-          // Log HTTP status code
           ESP_LOGD("http_request", "HTTP Status Code: %d", http_code);
   
-          // Check if the HTTP request was successful
           if (http_code == 200) {
-            // Increase buffer size to handle the JSON data based on page size
-            DynamicJsonDocument doc(4096);  // Adjusted for safe parsing
+            DynamicJsonDocument doc(8192);  // Adjusted for larger JSON data
             DeserializationError error = deserializeJson(doc, http.getString());
   
             if (!error) {
               JsonObject hourly_prices = doc["hourly_prices"];
               auto now = id(ntp_time).now();
               int start_hour = now.hour;
+              int day_of_month = now.day_of_month;  // Use day_of_month instead of day
+              int day_offset = 0;
+              bool found_starting_hour = false;
+              int i = 0;  // Declare i outside the loop
   
-              // Loop to populate the next 12 hours of prices in `prices_12h`
-              for (int i = 0; i < 12; i++) {
-                int hour = (start_hour + i) % 24;
-                int day_offset = (start_hour + i) / 24;
+              for (JsonPair kv : hourly_prices) {
+                const char* hour_key = kv.key().c_str();
+                const char* time_str = kv.value()["time"];
+                struct tm tm;
+                strptime(time_str, "%Y-%m-%d %H:%M:%S%z", &tm);
   
-                // Construct the key in the format "0.x" or "1.x" depending on the day
-                char hour_key[10];
-                snprintf(hour_key, sizeof(hour_key), "%d.%d", day_offset, hour);
-  
-                // Check if the key exists in the JSON data
-                if (hourly_prices.containsKey(hour_key)) {
-                  float price = hourly_prices[hour_key]["price"].as<float>() / 1000.0 * 1.255;  // Adjust for EUR per kWh
-                  id(prices_12h)[i] = price;
-                  ESP_LOGD("http_request", "Hour %d Price: %.5f EUR/kWh", start_hour + i, price);
-                } else {
-                  ESP_LOGD("http_request", "Key %s not found in JSON data.", hour_key);
+                if (!found_starting_hour && tm.tm_hour == start_hour && tm.tm_mday == day_of_month) {
+                  found_starting_hour = true;
                 }
+  
+                if (found_starting_hour) {
+                  i = day_offset * 24 + tm.tm_hour - start_hour;
+                  if (i >= 0 && i < 12) {
+                    float price = kv.value()["price"].as<float>() / 1000.0 * 1.255;
+                    id(prices_12h)[i] = price;
+                    ESP_LOGD("http_request", "Hour %d Price: %.5f EUR/kWh", start_hour + i, price);
+                  }
+                }
+  
+                if (i >= 12) break;  // Stop after 12 entries
               }
             } else {
               ESP_LOGD("http_request", "Failed to parse JSON or incorrect format.");
             }
           } else {
-            // Log failure details
             ESP_LOGD("http_request", "Failed to fetch data. HTTP Code: %d", http_code);
             String response_body = http.getString();
             ESP_LOGD("http_request", "HTTP Response Body: %s", response_body.c_str());
           }
   
-          // End the HTTP request
           http.end();
 
       - script.execute: update_leds_based_on_prices

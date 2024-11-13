@@ -19,7 +19,7 @@ globals:
   - id: led_brightness
     type: float
     restore_value: yes
-    initial_value: '0.25'
+    initial_value: '0.22'
   - id: prices_12h
     type: float[12]
     restore_value: no
@@ -42,21 +42,28 @@ ota:
 wifi:
   ssid: !secret wifi50_ssid
   password: !secret wifi50_password
+  on_connect:
+    then:
+      - delay: 500ms  # Ensure a small delay before executing the effect
+      - light.turn_on:
+          id: led_power_ring
+          effect: "loading scan"
+      - delay: 5s  # Ensure the effect runs for a moment before executing other actions
+      - light.turn_off:
+          id: led_power_ring
+      - delay: 3s 
+      - script.execute: fetch_12h_prices
 
   ap:
     ssid: "SahkokelloAP"
     password: "wPmheT2aPK33"
 
+captive_portal:
+
 time:
   - platform: sntp
     id: ntp_time
     timezone: Europe/Helsinki
-
-captive_portal:
-
-# Enable the Web Server for the HTTP interface
-web_server:
-  port: 80
 
 number:
   - platform: template
@@ -80,6 +87,11 @@ light:
     rgb_order: GRB
     name: "led_power_ring"
     id: led_power_ring
+    effects:
+      - addressable_scan:
+          name: "loading scan"
+          move_interval: 40ms
+          scan_width: 5
 
 # Sensor to store the current hour price
 sensor:
@@ -99,6 +111,16 @@ text_sensor:
             id(led_color).publish_state("green");
 
 script:
+  - id: set_default_led_brightness
+    then:
+      - light.addressable_set:
+          id: led_power_ring
+          color_brightness: !lambda 'return id(led_brightness);'
+          red: 0.0
+          green: 0.0
+          blue: 1.0
+          range_from: 0
+          range_to: 60
   - id: set_led_color
     then:
       - light.addressable_set:
@@ -234,4 +256,11 @@ script:
 interval:
   - interval: 60s  # Runs every minute
     then:
-      - script.execute: fetch_12h_prices
+      - if:
+          condition:
+            wifi.connected:  # Check if Wi-Fi is connected
+          then:
+            - script.execute: fetch_12h_prices
+          else:
+            - lambda: |-
+                ESP_LOGW("network", "No network connection. Skipping fetch_12h_prices script.");

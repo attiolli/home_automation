@@ -8,6 +8,32 @@ esp32:
     type: arduino
 
 globals:
+  ##############################
+  # User definable values here #
+  ##############################
+  # Low price threshold in €
+  # Green leds used if price below this.
+  - id: low_price_threshold
+    type: float
+    restore_value: yes
+    initial_value: '0.050'
+  # High price threshold in €
+  # Yellow leds used if price between low_price_threshold and this.
+  # Red leds used if price over this.
+  - id: high_price_threshold
+    type: float
+    restore_value: yes
+    initial_value: '0.150'
+  # Define the led brightness here
+  # Value between 0.0 to 1.0.
+  # Value 0.22 means 22% brightness.
+  - id: led_brightness
+    type: float
+    restore_value: yes
+    initial_value: '0.22'
+  #########################################
+  ### Dont change values after this !!! ###
+  #########################################
   - id: start_led_param
     type: int
     restore_value: no
@@ -16,10 +42,6 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
-  - id: led_brightness
-    type: float
-    restore_value: yes
-    initial_value: '0.22'
   - id: prices_12h
     type: float[12]
     restore_value: no
@@ -44,11 +66,11 @@ wifi:
   password: !secret wifi50_password
   on_connect:
     then:
-      - delay: 500ms  # Ensure a small delay before executing the effect
+      - delay: 500ms
       - light.turn_on:
           id: led_power_ring
           effect: "loading scan"
-      - delay: 5s  # Ensure the effect runs for a moment before executing other actions
+      - delay: 5s
       - light.turn_off:
           id: led_power_ring
       - delay: 3s 
@@ -79,6 +101,7 @@ number:
         - script.execute: update_led_brightness
 
 # LED strip configuration
+# Tested with WS2812B 5VDC - 60LED (circle of leds)
 light:
   - platform: fastled_clockless
     chipset: WS2812B
@@ -138,6 +161,7 @@ script:
           int leds_per_sector = 5;
           int num_sectors = 12;
           int start_sector = current_hour % num_sectors;
+          std::string color = "none";
   
           for (int sector_offset = 0; sector_offset < num_sectors; sector_offset++) {
             int sector = (start_sector + sector_offset) % num_sectors;
@@ -146,21 +170,24 @@ script:
             int end_led = start_led + leds_per_sector - 1;
             float price = id(prices_12h)[sector_offset];
   
-            if (price < 0.050) {
+            if (price < id(low_price_threshold)) {
               id(start_led_param) = start_led;
               id(end_led_param) = end_led;
               id(set_green_led_range).execute();
-            } else if (price >= 0.050 && price < 0.150) {
+              color = "green";
+            } else if (price >= id(low_price_threshold) && price < id(high_price_threshold)) {
               id(start_led_param) = start_led;
               id(end_led_param) = end_led;
               id(set_yellow_led_range).execute();
+              color = "yellow";
             } else {
               id(start_led_param) = start_led;
               id(end_led_param) = end_led;
               id(set_red_led_range).execute();
+              color = "red";
             }
   
-            ESP_LOGD("led_update", "Sector %d (Hour %d) Price: %.3f EUR, LEDs %d-%d set to color", sector + 1, hour_for_sector, price, start_led, end_led);
+            ESP_LOGD("led_update", "Sector %d (Hour %d) Price: %.3f EUR, LEDs %d-%d set to color %s", sector + 1, hour_for_sector, price, start_led, end_led, color.c_str());
           }
   - id: fetch_12h_prices
     then:
@@ -254,11 +281,11 @@ script:
           range_to: !lambda 'return {id(end_led_param)};'
 
 interval:
-  - interval: 60s  # Runs every minute
+  - interval: 300s
     then:
       - if:
           condition:
-            wifi.connected:  # Check if Wi-Fi is connected
+            wifi.connected:
           then:
             - script.execute: fetch_12h_prices
           else:

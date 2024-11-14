@@ -8,9 +8,10 @@ esp32:
     type: arduino
 
 globals:
-  ##############################
-  # User definable values here #
-  ##############################
+  #######################################################################
+  # User defined values here                                          ###
+  # (Check also GPIO definition under light/LED strip configuration)  ###
+  #######################################################################
   # Low price threshold in €
   # Green leds used if price below this.
   - id: low_price_threshold
@@ -31,9 +32,9 @@ globals:
     type: float
     restore_value: yes
     initial_value: '0.22'
-  #########################################
-  ### Dont change values after this !!! ###
-  #########################################
+  #########################################################
+  ### Dont change "globals" values after this !!!       ###
+  #########################################################
   - id: start_led_param
     type: int
     restore_value: no
@@ -47,11 +48,6 @@ globals:
     restore_value: no
 
 logger:
-
-http_request:
-  id: my_request
-  useragent: esphome/1.0
-  verify_ssl: false
 
 api:
   encryption:
@@ -73,14 +69,31 @@ wifi:
       - delay: 5s
       - light.turn_off:
           id: led_power_ring
-      - delay: 3s 
-      - script.execute: fetch_12h_prices
-
+      - delay: 3s
+      - if:
+          condition:
+            wifi.connected:
+          then:
+            - script.execute: fetch_12h_prices
+          else:
+            - lambda: |-
+                ESP_LOGD("wifi", "Wi-Fi not connected; skipping fetch_12h_prices.");
   ap:
-    ssid: "SahkokelloAP"
-    password: "wPmheT2aPK33"
+    ssid: !secret skapssid
+    password: !secret skappassword
 
 captive_portal:
+
+web_server:
+  port: 80
+  include_internal: true
+  log: false
+  version: 3
+
+http_request:
+  id: my_request
+  useragent: esphome/1.0
+  verify_ssl: false
 
 time:
   - platform: sntp
@@ -100,12 +113,14 @@ number:
       then:
         - script.execute: update_led_brightness
 
-# LED strip configuration
+####################################################
+# Light/LED strip configuration
 # Tested with WS2812B 5VDC - 60LED (circle of leds)
+####################################################
 light:
   - platform: fastled_clockless
     chipset: WS2812B
-    pin: GPIO27
+    pin: GPIO27 #Change this according to your setup
     num_leds: 60
     rgb_order: GRB
     name: "led_power_ring"
@@ -115,13 +130,6 @@ light:
           name: "loading scan"
           move_interval: 40ms
           scan_width: 5
-
-# Sensor to store the current hour price
-sensor:
-  - platform: template
-    name: "Current Hour Price"
-    id: current_hour_price
-    unit_of_measurement: "€"
 
 text_sensor:
   - platform: template

@@ -1,40 +1,32 @@
 esphome:
   name: sahkokello
   friendly_name: sahkokello
+  on_boot: 
+    then:
+      - light.turn_on:
+          id: led_power_ring
+          effect: "loading scan"
+
 
 esp32:
   board: esp32dev
   framework:
     type: arduino
 
+  
 globals:
-  #######################################################################
-  # User defined values here                                          ###
-  # (Check also GPIO definition under light/LED strip configuration)  ###
-  #######################################################################
-  # Low price threshold in €
-  # Green leds used if price below this.
   - id: low_price_threshold
     type: float
     restore_value: yes
     initial_value: '0.050'
-  # High price threshold in €
-  # Yellow leds used if price between low_price_threshold and this.
-  # Red leds used if price over this.
   - id: high_price_threshold
     type: float
     restore_value: yes
     initial_value: '0.150'
-  # Define the led brightness here
-  # Value between 0.0 to 1.0.
-  # Value 0.22 means 22% brightness.
   - id: led_brightness
     type: float
     restore_value: yes
     initial_value: '0.22'
-  #########################################################
-  ### Dont change "globals" values after this !!!       ###
-  #########################################################
   - id: start_led_param
     type: int
     restore_value: no
@@ -65,19 +57,13 @@ wifi:
       - delay: 500ms
       - light.turn_on:
           id: led_power_ring
-          effect: "loading scan"
+          effect: "slow pulse"
       - delay: 5s
       - light.turn_off:
           id: led_power_ring
-      - delay: 3s
-      - if:
-          condition:
-            wifi.connected:
-          then:
-            - script.execute: fetch_12h_prices
-          else:
-            - lambda: |-
-                ESP_LOGD("wifi", "Wi-Fi not connected; skipping fetch_12h_prices.");
+      - delay: 4s
+      - script.execute: fetch_12h_prices
+
   ap:
     ssid: !secret skapssid
     password: !secret skappassword
@@ -102,6 +88,32 @@ time:
 
 number:
   - platform: template
+    name: "Set low price threshold"
+    id: set_low_price_threshold
+    min_value: 0.0
+    max_value: 0.20
+    step: 0.001
+    icon: "mdi:currency-eur"
+    optimistic: true
+    restore_value: true
+    on_value:
+      then:
+        - lambda: |-
+            id(low_price_threshold) = id(set_low_price_threshold).state;
+  - platform: template
+    name: "Set high price threshold"
+    id: set_high_price_threshold
+    min_value: 0.0
+    max_value: 0.20
+    step: 0.001
+    icon: "mdi:currency-eur"
+    optimistic: true
+    restore_value: true
+    on_value:
+      then:
+        - lambda: |-
+            id(high_price_threshold) = id(set_high_price_threshold).state;
+  - platform: template
     name: "LED Brightness"
     id: led_brightness_input
     min_value: 0.0
@@ -109,6 +121,7 @@ number:
     step: 0.01
     icon: "mdi:brightness-7"
     optimistic: true
+    restore_value: true
     on_value:
       then:
         - script.execute: update_led_brightness
@@ -126,6 +139,14 @@ light:
     name: "led_power_ring"
     id: led_power_ring
     effects:
+      - pulse:
+          name: "slow Pulse"
+          min_brightness: 0%
+          max_brightness: 20%
+          update_interval: 750ms
+          transition_length:
+            on_length: 500ms
+            off_length: 250ms
       - addressable_scan:
           name: "loading scan"
           move_interval: 40ms
@@ -152,6 +173,7 @@ script:
           blue: 1.0
           range_from: 0
           range_to: 60
+
   - id: set_led_color
     then:
       - light.addressable_set:
@@ -162,6 +184,7 @@ script:
           blue: !lambda 'return id(led_color).state == "orange" ? 0.65 : 0.0;'
           range_from: !lambda 'return {id(start_led_param)};'
           range_to: !lambda 'return {id(end_led_param)};'
+
   - id: update_leds_based_on_prices
     then:
       - lambda: |-

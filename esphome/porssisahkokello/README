@@ -6,7 +6,7 @@ Instructions:
   - Hook up you esp32 board with led ring pins for GND, VCC and GPIO for addressable led data
   - Check the light component GPIO pin (GPIO27 as default for data on the code) to match your setup.
   - Check esp32 board type to match your environment
-  - Check wifi component config to match your environment
+  - Check wifi (and ap under that) component config to match your environment
   - Load the code to the esp32 board
   - Connect to the device IP or mDNS name and set the following parameters as you wish:
     - LED Brightness (between 0.0 - 1.0 as %, value 0.22 seems fairly good)   

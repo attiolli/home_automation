@@ -12,7 +12,9 @@ Instructions:
     - LED Brightness (between 0.0 - 1.0 as %, value 0.22 seems fairly good)   
     - Set high price threshold (Price in Eur - If hour price is above this, leds are turned red to indicate expensive hours)
     - Set low price threshold (Price in Eur - If hour price is below this, leds are turned green to indicate cheap hours)
-    - (Hours that are between cheap and expensive are colored as yellow(ish) )
+      (Hours that are between cheap and expensive are colored as yellow(ish) )
+    - Note! When you change the parameters from the web gui they will be taken into action on the next scheduled update which
+      happens by default every 5min.
 
 Optionally:
   * Enable API on the code to set HomeAssistant connectivity

@@ -3,8 +3,8 @@ Esphome based led controller to control a 60 led ring to show electricity spot p
 The code is using this API endpoint to retrieve price data: https://elspotcontrol.netlify.app/spotprices-v01-FI.json
 
 Instructions:
-  - Hook up you esp32 board with led ring pins for GND, VCC and GPIO for addressable led data
-  - Check the light component GPIO pin (GPIO27 as default for data on the code) to match your setup.
+  * Hook up you esp32 board with led ring pins for GND, VCC and GPIO for addressable led data
+  * Check the light component GPIO pin (GPIO27 as default for data on the code) to match your setup.
   - Check esp32 board type to match your environment
   - Check wifi (and ap under that) component config to match your environment
   - Load the code to the esp32 board

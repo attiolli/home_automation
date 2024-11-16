@@ -35,9 +35,10 @@ globals:
 
 logger:
 
-api:
-  encryption:
-    key: "V/wwufPJjMUIHpJso+bUTsVFlmwDUIARot9B0XwA7v4="
+# Use this if you want HomeAssistant control over things
+#api:
+#  encryption:
+#    key: "V/wwufPJjMUIHpJso+bUTsVFlmwDUIARot9B0XwA7v4="
 
 ota:
   - platform: esphome
@@ -48,7 +49,13 @@ wifi:
   password: !secret wifi50_password
   on_connect:
     then:
-      - script.execute: fetch_12h_prices
+      - if:
+          condition:
+            wifi.connected:
+          then:
+            - script.execute: fetch_12h_prices
+            - delay: 5s # Because watchdog
+            - script.execute: update_leds_based_on_prices
   ap:
     ssid: !secret skapssid
     password: !secret skappassword
@@ -202,6 +209,8 @@ script:
               id(set_red_led_range).execute();
               color = "red";
             }
+
+
   
             //ESP_LOGD("led_update", "Sector %d (Hour %d) Price: %.3f EUR, LEDs %d-%d set to color %s", sector + 1, hour_for_sector, price, start_led, end_led, color.c_str());
           }
@@ -255,8 +264,6 @@ script:
           }
           http.end();
   
-  
-      - script.execute: update_leds_based_on_prices
 
   - id: update_led_brightness
     then:
@@ -304,6 +311,8 @@ interval:
             wifi.connected:
           then:
             - script.execute: fetch_12h_prices
+            - delay: 5s # Because watchdog
+            - script.execute: update_leds_based_on_prices
           else:
             - lambda: |-
                 ESP_LOGW("network", "No network connection. Skipping fetch_12h_prices script.");

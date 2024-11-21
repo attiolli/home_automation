@@ -24,3 +24,8 @@ Essential parts used:
   * ESP32 dev board (I use ezsbc ESP32 Breakout and Development Board which was laying around)
   * DC5V WS2812B LED Ring 5050 RGB Individually Addressable 60 93 Pixels 
     Round Modules 3Pin Smart BuiIt-in IC Black White PCB Circle (Aliexpress)
+
+Note 2024/11/21:
+It seems that if the clock has been offline / without power for a long time, the NTP time might not be synced right after boot.
+This produces false led colors. Usually the time gets synced on the first few minutes so after that the leds should show
+the correct price color.
